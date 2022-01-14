@@ -1,8 +1,11 @@
+import json
 import time
 from typing import List
 
 from django.conf import settings
 from django.db import models
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 
 from user.models import Member
 
@@ -29,12 +32,16 @@ class Conversation(models.Model):
     con_group_options = models.TextField(null=True)
     con_users = models.TextField(null=True)
 
+    @property
+    def lastChat(self) -> dict:
+        return json.loads(self.con_lastChat)
+
     def __str__(self):
-        return self.con_name
+        return str(self.con_name) + str(self.users)
 
     @property
     def last_post(self):
-        return ConversationPost.objects.filter(chat_con=self.con_id).order_by('-chat_time').first()
+        return ConversationPost.objects.get(chat_id=self.con_lastID)
 
     @property
     def posts(self):
@@ -43,15 +50,34 @@ class Conversation(models.Model):
     def isGroup(self):
         return self.con_isGroup == 1
 
+    @property
     def users(self) -> List[int]:
-        if self.con_users:
+        if not self.con_users:
             return []
         return list(map(int, self.con_users.split(',')))
+
+    def post(self, content: str, member_id: int):
+        post = ConversationPost.objects.create(chat_con=self.con_id, chat_content=content, chat_member_id=member_id)
+        self._update_conv_maps(member_id)
+        self.con_lastID = post.chat_id
+        lastChat = self.lastChat
+        lastChat.update({
+            str(member_id): int(time.time()),
+        })
+        self.con_lastChat = json.dumps(lastChat)
+        self.save()
+        return post
+
+    def _update_conv_maps(self, sender_id: int):
+        userMaps = ConversationUserMap.objects.filter(map_con_id=self.con_id)
+        for userMap in userMaps:
+            if userMap.map_user_id != sender_id:
+                userMap.map_unread += 1
+            userMap.save()
 
 
 class ConversationUserMap(models.Model):
     class Meta:
-
         managed = not settings.USE_IPB
         db_table = 'chatbox_conversations_user_map'
         indexes = [
@@ -91,7 +117,7 @@ class ConversationPost(models.Model):
     chat_sys = models.TextField(null=True)
 
     def __str__(self):
-        return self.chat_content
+        return str(self.chat_content)
 
     @property
     def conversation(self):
@@ -106,3 +132,19 @@ class ConversationPost(models.Model):
 
     def isFile(self):
         return self.chat_fileID > 0
+
+
+@receiver(pre_save, sender=ConversationPost)
+def convPostPreSave(sender, instance, **kwargs):
+    if instance.pk is None:
+        instance: ConversationPost
+        instance.chat_time = int(time.time())
+        instance.chat_title = instance.chat_content[:254]
+        instance.chat_title_furl = instance.chat_content[:254].lower() \
+            .replace(' ', '-').replace('.', '').replace('/', '').replace('\\', '').replace('\'', '')
+
+
+@receiver(pre_save, sender=ConversationUserMap)
+def convUserMapPreSave(sender, instance, **kwargs):
+    instance: ConversationUserMap
+    instance.map_update = int(time.time())

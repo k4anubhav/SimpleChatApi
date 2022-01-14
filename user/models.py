@@ -18,7 +18,6 @@ assert settings.USE_IPB is not None
 
 # We don't want any changes in ipb database model
 
-
 class User(AbstractBaseUser):
     name = models.CharField(max_length=255, unique=True)
     email = models.EmailField(unique=True)
@@ -37,15 +36,16 @@ class User(AbstractBaseUser):
     @staticmethod
     def authenticate(request: HttpRequest, name, password):
         """
+        Authenticate user by name|username and password
 
-            :param request: raw request from django, not drf
-            :type request: HttpRequest
-            :param name: username
-            :type name: str
-            :param password: password
-            :type password: str
-            :return: user and its token
-            :rtype: (User|None, Member|None, str|None)
+        :param request: raw request from django, not drf
+        :type request: HttpRequest
+        :param name: username
+        :type name: str
+        :param password: password
+        :type password: str
+        :return: user and its token
+        :rtype: (User|None, Member|None, str|None)
         """
         if settings.USE_IPB:
             authenticated, token = ipb_oauth_authenticate(name, password)
