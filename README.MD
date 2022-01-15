@@ -12,6 +12,7 @@ eg:
 1. User management
 2. 1 to 1 Conversation
 3. Group Conversation
+4. Both Rest and websocket supported
 
 ## SwaggerApi Documentation
 

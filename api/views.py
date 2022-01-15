@@ -9,10 +9,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.models import ConversationUserMap, Conversation
-from user.models import User
+from user.models import User, MemberToken
 from .permissions import IsAuthAndNotBanned
 from .serializers import ConversationGetSerializer, LoginSerializer, ConversationSendSerializer, \
-    ConversationPostModelSerializer
+    ConversationPostModelSerializer, LogoutSerializer
 from .utils import conversationMapToBrief, method_permission_classes
 
 PageSize = 50
@@ -35,6 +35,22 @@ def login(request: Request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@api_view(['POST'])
+def logout(request: Request):
+    if request.user.is_authenticated:
+        serializer = LogoutSerializer(data=request.data)
+        if serializer.is_valid():
+            if serializer.data['allDevices']:
+                MemberToken.objects.filter(user=request.user).delete()
+            else:
+                MemberToken.objects.filter(token=request.token).delete()
+            return Response(status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        return Response(status=status.HTTP_401_UNAUTHORIZED)
+
+
 class MemberView(APIView):
     @method_permission_classes((IsAuthAndNotBanned,))
     @method_decorator(cache_page(60 * 5))
@@ -52,7 +68,7 @@ class ConversionBriefView(APIView):
     def get(self, request: Request, format=None):
         conversationsMap: QuerySet[ConversationUserMap] = ConversationUserMap.objects.filter(
             map_user_id=request.user.member_id).order_by('-map_update').all()
-        conversations_brief = conversationMapToBrief(conversationsMap)
+        conversations_brief = conversationMapToBrief(request.user, conversationsMap)
         conversations_brief.sort(key=lambda x: x['lastMsgTime'], reverse=True)
         return Response({"conversations": conversations_brief}, status=status.HTTP_200_OK)
 

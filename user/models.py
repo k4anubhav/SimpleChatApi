@@ -1,3 +1,5 @@
+import os
+import re
 import time
 from typing import Union
 from uuid import uuid4
@@ -14,6 +16,7 @@ from django.http import HttpRequest
 from user.utils import ipb_oauth_authenticate
 
 assert settings.USE_IPB is not None
+UPLOAD_PATH = os.environ.get('UPLOAD_PATH')
 
 
 # We don't want any changes in ipb database model
@@ -91,6 +94,16 @@ class Member(models.Model):
     @property
     def banned(self):
         return self.temp_ban > time.time()
+
+    @property
+    def profile_photo(self):
+        if settings.USE_IPB:
+            if re.match(r'.+\.(gif|jpe?g|bmp|png)$', self.pp_main_photo):
+                return UPLOAD_PATH + self.pp_main_photo
+            else:
+                return None
+        else:
+            return self.pp_main_photo
 
 
 class MemberToken(models.Model):

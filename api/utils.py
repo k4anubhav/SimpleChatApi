@@ -1,11 +1,12 @@
 # from https://stackoverflow.com/questions/19773869/django-rest-framework-separate-permissions-per-methods
 import time
-from typing import List, Union
+from typing import List, Union, Optional
 
 from django.db.models import QuerySet
 
 from api.TypedResponse import ConversationBrief
 from core.models import ConversationUserMap, Conversation
+from user.models import Member, User
 
 
 def method_permission_classes(classes):
@@ -21,7 +22,22 @@ def method_permission_classes(classes):
     return decorator
 
 
+def getConvIcon(user_id: int, conv_id: int) -> Optional[str]:
+    conv = Conversation.objects.get(con_id=conv_id)
+    if conv.isGroup():
+        # TODO: get icon for group
+        return None
+    else:
+        users_id = conv.users
+        try:
+            users_id.remove(user_id)
+            return Member.objects.get(member_id=users_id[0]).profile_photo
+        except ValueError or IndexError:
+            return None
+
+
 def conversationMapToBrief(
+        user: User,
         data: Union[QuerySet[ConversationUserMap], List[ConversationUserMap]]
 ) -> List[ConversationBrief]:
 
@@ -31,7 +47,7 @@ def conversationMapToBrief(
         if last_post := conv.last_post:
             ret.append(
                 ConversationBrief(
-                    icon='',  # TODO: get icon
+                    icon=getConvIcon(user.member_id, _conv.map_con_id),
                     id=_conv.map_con_id,
                     inDay=24 * 60 * 60 > (time.time() - _conv.map_update),
                     isGroup=conv.isGroup(),
@@ -45,42 +61,5 @@ def conversationMapToBrief(
                 )
             )
     return ret
-
-def ipb_login(username, password):
-    @staticmethod
-    def authenticate(username: str, password: str):
-        """
-        authenticate users
-
-        :param username: username/email of user
-        :type username: str
-        :param password: pas
-        :type password: password
-        :return: Tuple of is user authenticated and user object
-        :rtype: (bool, Account)
-        """
-        authenticated, token = oauth_authenticate(username, password)
-        if not authenticated:
-            return False, None
-
-        token_match_queryset = Account.objects.filter(token=token)
-
-        if token_match_queryset.exists():
-            return True, token_match_queryset[0]
-
-        user_id, username = get_user_info(token)
-
-        if (not user_id) or (not username):
-            return False, None
-
-        user_queryset = Account.objects.filter(user_id=user_id)
-        if user_queryset.exists():
-            user: Account = user_queryset[0]
-            user.token = token
-            user.save()
-            return True, user
-
-        user = Account.objects.create_user(user_id=user_id, username=username, token=token)
-        return True, user
 
 
