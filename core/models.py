@@ -1,6 +1,6 @@
 import json
 import time
-from typing import List
+from typing import List, Optional
 
 from django.conf import settings
 from django.db import models
@@ -41,7 +41,10 @@ class Conversation(models.Model):
 
     @property
     def last_post(self):
-        return ConversationPost.objects.get(chat_id=self.con_lastID)
+        try:
+            return ConversationPost.objects.get(chat_id=self.con_lastID)
+        except ConversationPost.DoesNotExist:
+            return None
 
     @property
     def posts(self):
@@ -55,6 +58,23 @@ class Conversation(models.Model):
         if not self.con_users:
             return []
         return list(map(int, self.con_users.split(',')))
+
+    def get_posts(self, load_from: Optional[int], load_to: Optional[int], last_update: int, order_by: str = '-chat_time'):
+        filter_args = {}
+        if load_from:
+            filter_args["post_id__gt"] = load_from
+        if load_to:
+            filter_args["post_id__lt"] = load_to
+        if filter_args:
+            posts = ConversationPost.objects.filter(chat_con=self.con_id, **filter_args)
+        else:
+            posts = ConversationPost.objects.filter(chat_con=self.con_id, chat_time__gt=last_update)
+        if order_by:
+            posts = posts.order_by(order_by)
+        return posts
+
+    def get_posts_async(self, load_from: Optional[int], load_to: Optional[int], last_update: int, order_by: str = '-chat_time'):
+        return self.get_posts(load_from, load_to, last_update, order_by)
 
     def post(self, content: str, member_id: int):
         post = ConversationPost.objects.create(chat_con=self.con_id, chat_content=content, chat_member_id=member_id)

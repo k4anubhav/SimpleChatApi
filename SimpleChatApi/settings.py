@@ -28,6 +28,8 @@ print(f'USE_IPB: {USE_IPB}')
 # Application definition
 
 INSTALLED_APPS = [
+    'channels',
+
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -40,6 +42,7 @@ INSTALLED_APPS = [
     'user',
     'core',
     'api',
+    'websocket',
 ]
 
 MIDDLEWARE = [
@@ -74,6 +77,17 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'SimpleChatApi.wsgi.application'
+ASGI_APPLICATION = 'SimpleChatApi.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        # 'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        # 'CONFIG': {
+        #     "hosts": [('127.0.0.1', 6379)],
+        # },
+    },
+}
 
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases

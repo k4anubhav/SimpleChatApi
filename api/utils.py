@@ -1,14 +1,16 @@
-# from https://stackoverflow.com/questions/19773869/django-rest-framework-separate-permissions-per-methods
 import time
 from typing import List, Union, Optional
 
+from channels.db import database_sync_to_async
 from django.db.models import QuerySet
 
 from api.TypedResponse import ConversationBrief
+from api.serializers import ConversationPostModelSerializer
 from core.models import ConversationUserMap, Conversation
 from user.models import Member, User
 
 
+# from https://stackoverflow.com/questions/19773869/django-rest-framework-separate-permissions-per-methods
 def method_permission_classes(classes):
     def decorator(func):
         def decorated_func(self, *args, **kwargs):
@@ -36,18 +38,17 @@ def getConvIcon(user_id: int, conv_id: int) -> Optional[str]:
             return None
 
 
-def conversationMapToBrief(
-        user: User,
+def conversationMapToBriefByID(
+        user_id: int,
         data: Union[QuerySet[ConversationUserMap], List[ConversationUserMap]]
 ) -> List[ConversationBrief]:
-
     ret: List[ConversationBrief] = []
     for _conv in data:
         conv: Conversation = _conv.conversation
         if last_post := conv.last_post:
             ret.append(
                 ConversationBrief(
-                    icon=getConvIcon(user.member_id, _conv.map_con_id),
+                    icon=getConvIcon(user_id, _conv.map_con_id),
                     id=_conv.map_con_id,
                     inDay=24 * 60 * 60 > (time.time() - _conv.map_update),
                     isGroup=conv.isGroup(),
@@ -63,3 +64,13 @@ def conversationMapToBrief(
     return ret
 
 
+def conversationMapToBrief(
+        user: User,
+        data: Union[QuerySet[ConversationUserMap], List[ConversationUserMap]]
+) -> List[ConversationBrief]:
+    return conversationMapToBriefByID(user.member_id, data)
+
+
+@database_sync_to_async
+def postSerializerAsync(posts, *args, **kwargs):
+    return ConversationPostModelSerializer(posts, *args, **kwargs).data

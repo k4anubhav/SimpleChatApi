@@ -40,6 +40,7 @@ class ConversationPostModelSerializer(serializers.ModelSerializer):
         read_only_fields = ('chat_time', 'chat_sys')
 
 
+
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField(required=True, max_length=255)
     password = serializers.CharField(required=True, max_length=255)

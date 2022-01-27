@@ -3,3 +3,4 @@ channels==3.0.4
 python-dotenv
 djangorestframework==3.13.1
 requests==2.27.1
+multipledispatch==0.6.0

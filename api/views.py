@@ -1,3 +1,7 @@
+import os
+from typing import Union
+
+from channels.db import database_sync_to_async
 from django.db.models import QuerySet
 from django.http import HttpResponseRedirect
 from django.utils.decorators import method_decorator
@@ -7,15 +11,16 @@ from rest_framework.decorators import api_view
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from multipledispatch import dispatch
 
 from core.models import ConversationUserMap, Conversation
-from user.models import User, MemberToken
+from user.models import User, MemberToken, Member
 from .permissions import IsAuthAndNotBanned
 from .serializers import ConversationGetSerializer, LoginSerializer, ConversationSendSerializer, \
     ConversationPostModelSerializer, LogoutSerializer
 from .utils import conversationMapToBrief, method_permission_classes
 
-PageSize = 50
+PageSize = int(os.environ.get('PAGE_SIZE', 50))
 
 
 @api_view(['POST'])
@@ -76,10 +81,19 @@ class ConversionBriefView(APIView):
 class ConversationView(APIView):
 
     @staticmethod
-    def get_conv(request: Request, pk: int) -> Conversation:
+    def get_conv(user_or_request: Union[User, Request], pk: int) -> Conversation:
+        if isinstance(user_or_request, Request):
+            user = user_or_request.user
+        else:
+            user = user_or_request
         conversation = Conversation.objects.get(con_id=pk)
-        conversation.users.index(request.user.member_id)
+        conversation.users.index(user.member_id)
         return conversation
+
+    @staticmethod
+    @database_sync_to_async
+    def get_conv_async(user_or_request: Union[User, Request], pk: int) -> Conversation:
+        return ConversationView.get_conv(user_or_request, pk)
 
     @method_permission_classes((IsAuthAndNotBanned,))
     def get(self, request: Request, pk: int, format=None):
@@ -96,16 +110,8 @@ class ConversationView(APIView):
             load_from = serializer.validated_data.get("loadFrom")
             load_to = serializer.validated_data.get("loadTo")
             last_update = serializer.validated_data.get("lastUpdate")
-            posts = conversation.posts.order_by('chat_id')
-            filter_args = {}
-            if load_from:
-                filter_args["post_id__gt"] = load_from
-            if load_to:
-                filter_args["post_id__lt"] = load_to
-            if filter_args:
-                posts = posts.filter(**filter_args)
-            else:
-                posts = posts.filter(chat_time__gt=last_update)
+            posts = conversation.get_posts(load_from=load_from, load_to=load_to, last_update=last_update, order_by='chat_id')
+
             return Response({
                 "messages": ConversationPostModelSerializer(posts[:PageSize], many=True).data,
             }, status=status.HTTP_200_OK)
