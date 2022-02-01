@@ -1,13 +1,18 @@
 import json
+import os
 import time
-from typing import List, Optional
+from typing import List, Optional, Union, Awaitable
 
+from channels.db import database_sync_to_async
 from django.conf import settings
 from django.db import models
+from django.db.models import QuerySet
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
 
 from user.models import Member
+
+PageSize = int(os.environ.get('PAGE_SIZE', 50))
 
 
 # No ForeignKey is Used for any of the following models
@@ -59,21 +64,30 @@ class Conversation(models.Model):
             return []
         return list(map(int, self.con_users.split(',')))
 
-    def get_posts(self, load_from: Optional[int], load_to: Optional[int], last_update: int, order_by: str = '-chat_time'):
-        filter_args = {}
-        if load_from:
-            filter_args["post_id__gt"] = load_from
-        if load_to:
-            filter_args["post_id__lt"] = load_to
-        if filter_args:
-            posts = ConversationPost.objects.filter(chat_con=self.con_id, **filter_args)
-        else:
-            posts = ConversationPost.objects.filter(chat_con=self.con_id, chat_time__gt=last_update)
-        if order_by:
-            posts = posts.order_by(order_by)
-        return posts
+    def get_posts(self, load_from: Optional[int], load_to: Optional[int], last_update: int,
+                  order_by: str = '-chat_time', _async: bool = False, max_size: Optional[int] = PageSize) -> Union[QuerySet['ConversationPost'], Awaitable[QuerySet['ConversationPost']]]:
+        def _get_posts():
+            filter_args = {}
+            if load_from:
+                filter_args["post_id__gt"] = load_from
+            if load_to:
+                filter_args["post_id__lt"] = load_to
+            if filter_args:
+                posts = ConversationPost.objects.filter(chat_con=self.con_id, **filter_args)
+            else:
+                posts = ConversationPost.objects.filter(chat_con=self.con_id, chat_time__gt=last_update)
+            if order_by:
+                posts = posts.order_by(order_by)
+            if max_size:
+                posts = posts[:max_size]
+            return posts
 
-    def get_posts_async(self, load_from: Optional[int], load_to: Optional[int], last_update: int, order_by: str = '-chat_time'):
+        if _async:
+            return database_sync_to_async(_get_posts)()
+        return _get_posts()
+
+    def get_posts_async(self, load_from: Optional[int], load_to: Optional[int], last_update: int,
+                        order_by: str = '-chat_time'):
         return self.get_posts(load_from, load_to, last_update, order_by)
 
     def post(self, content: str, member_id: int):
@@ -86,6 +100,11 @@ class Conversation(models.Model):
         })
         self.con_lastChat = json.dumps(lastChat)
         self.save()
+        return post
+
+    @database_sync_to_async
+    def post_async(self, content: str, member_id: int):
+        post = self.post(content, member_id)
         return post
 
     def _update_conv_maps(self, sender_id: int):

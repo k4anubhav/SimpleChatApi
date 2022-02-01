@@ -16,6 +16,11 @@ class SetConversationSerializer(serializers.Serializer):
     chatID = serializers.IntegerField(min_value=1, required=True)
 
 
+class SendMessageSerializer(serializers.Serializer):
+    chatID = serializers.IntegerField(min_value=1, required=False)
+    message = serializers.CharField(max_length=255, required=True)
+
+
 class Response:
     @staticmethod
     def response(_type: str, data: dict) -> dict:

@@ -3,7 +3,7 @@ from django.conf import settings
 from .models import ConversationPost, Conversation, ConversationUserMap
 
 
-class MyDBRouter(object):
+class MyDBRouter:
 
     def db_for_read(self, model, **hints):
         """ reading SomeModel from otherdb """

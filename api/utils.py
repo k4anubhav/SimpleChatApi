@@ -1,11 +1,11 @@
 import time
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Coroutine, Any, Awaitable
 
 from channels.db import database_sync_to_async
 from django.db.models import QuerySet
+from rest_framework.request import Request
 
-from api.TypedResponse import ConversationBrief
-from api.serializers import ConversationPostModelSerializer
+from api.serializers import ConversationPostModelSerializer, ConversationInfoSerializer
 from core.models import ConversationUserMap, Conversation
 from user.models import Member, User
 
@@ -41,13 +41,13 @@ def getConvIcon(user_id: int, conv_id: int) -> Optional[str]:
 def conversationMapToBriefByID(
         user_id: int,
         data: Union[QuerySet[ConversationUserMap], List[ConversationUserMap]]
-) -> List[ConversationBrief]:
-    ret: List[ConversationBrief] = []
+):
+    ret = []
     for _conv in data:
         conv: Conversation = _conv.conversation
         if last_post := conv.last_post:
             ret.append(
-                ConversationBrief(
+                ConversationInfoSerializer(
                     icon=getConvIcon(user_id, _conv.map_con_id),
                     id=_conv.map_con_id,
                     inDay=24 * 60 * 60 > (time.time() - _conv.map_update),
@@ -59,7 +59,7 @@ def conversationMapToBriefByID(
                     title=conv.con_name,
                     unread=_conv.map_unread,
                     update=_conv.map_update,
-                )
+                ).data
             )
     return ret
 
@@ -67,10 +67,31 @@ def conversationMapToBriefByID(
 def conversationMapToBrief(
         user: User,
         data: Union[QuerySet[ConversationUserMap], List[ConversationUserMap]]
-) -> List[ConversationBrief]:
+) -> List:
     return conversationMapToBriefByID(user.member_id, data)
 
 
 @database_sync_to_async
 def postSerializerAsync(posts, *args, **kwargs):
     return ConversationPostModelSerializer(posts, *args, **kwargs).data
+
+
+def get_conv(
+        user_or_request: Union[User, Request],
+        pk: int,
+        _async: bool = False
+) -> Union[Conversation, Awaitable[Conversation]]:
+    def _get_conv(_user_or_request: Union[User, Request], _pk: int):
+        if isinstance(user_or_request, Request):
+            user = user_or_request.user
+        else:
+            user = user_or_request
+
+        conversation = Conversation.objects.get(con_id=pk)
+        conversation.users.index(user.member_id)
+        return conversation
+
+    if _async:
+        return database_sync_to_async(_get_conv)(user_or_request, pk)
+    else:
+        return _get_conv(user_or_request, pk)

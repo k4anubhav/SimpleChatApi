@@ -43,7 +43,22 @@ INSTALLED_APPS = [
     'core',
     'api',
     'websocket',
+
+    'drf_spectacular',
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'user.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'SimpleChat API',
+    'DESCRIPTION': 'A open source chat api',
+    'VERSION': '1.0.0',
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -52,7 +67,8 @@ MIDDLEWARE = [
     # 'django.middleware.csrf.CsrfViewMiddleware',
     'SimpleChatApi.middleware.CsrfExemptSessionAuthenticationMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'user.middleware.TokenMiddleware',
+
+    # 'user.middleware.TokenMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]

@@ -40,7 +40,6 @@ class ConversationPostModelSerializer(serializers.ModelSerializer):
         read_only_fields = ('chat_time', 'chat_sys')
 
 
-
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField(required=True, max_length=255)
     password = serializers.CharField(required=True, max_length=255)
@@ -48,3 +47,25 @@ class LoginSerializer(serializers.Serializer):
 
 class LogoutSerializer(serializers.Serializer):
     allDevices = serializers.BooleanField(required=False)
+
+
+class ErrorSerializer(serializers.Serializer):
+    error = serializers.CharField(required=True, max_length=255)
+    data = serializers.JSONField(required=False)
+
+
+class LoginResponseSerializer(serializers.Serializer):
+    token = serializers.CharField(required=True, max_length=255)
+
+
+class ConversationInfoSerializer(serializers.Serializer):
+    icon = serializers.CharField(required=False, max_length=255, default='/static/img/chat_icon.png')
+    id = serializers.IntegerField(required=True, min_value=1)
+    inDay = serializers.BooleanField(required=True)
+    isGroup = serializers.BooleanField(required=True)
+    isOnline = serializers.BooleanField(required=True)
+    lastMsg = serializers.CharField(required=True, max_length=255, allow_null=True)
+    lastMsgTime = serializers.IntegerField(required=True, min_value=1, allow_null=True)
+    title = serializers.CharField(required=True, max_length=255)
+    unread = serializers.IntegerField(required=True, min_value=0)
+    update = serializers.IntegerField(required=True, min_value=1)
